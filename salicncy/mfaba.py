@@ -61,6 +61,7 @@ def get_output(model, hidden_states):
     
 
 def mfaba_vision(model,processor,img, prompt):
+    loss_fn = torch.nn.CosineSimilarity()
     inp = processor(
         text=[prompt],
         images=img,
@@ -78,7 +79,21 @@ def mfaba_vision(model,processor,img, prompt):
     #     grad = torch.autograd.grad(logit, inp['pixel_values'])[0]
     #     grads.append(grad.cpu().detach())
     #     inp['pixel_values'] = inp['pixel_values'] - 0.01 * grad.sign()
-    #     hats.append(inp['pixel_values'].clone().detach().cpu()) 
+    #     hats.append(inp['pixel_values'].clone().detach().cpu())
+    hs = get_hs(model, inp['pixel_values'])
+    text_features = model.get_text_features(inp['input_ids'])
+    hats = [hs]
+    grads = list()
+    for _ in range(10):
+        hs = torch.autograd.Variable(hs, requires_grad=True)
+        image_features = get_output(model, hs)
+        model.zero_grad()
+        loss = loss_fn(image_features, text_features).mean()
+        grad = torch.autograd.grad(loss, hs)[0]
+        hs = hs - 0.01 * grad.sign()
+        hats.append(hs)
+        grads.append(grad.cpu().detach())
+        
     hats = torch.stack(hats)
     hats = hats[1:] - hats[:-1]
     grads = torch.stack(grads)
