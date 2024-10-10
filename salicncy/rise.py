@@ -16,7 +16,7 @@ class RISEV(nn.Module):
         self.gpu_batch = gpu_batch
         self.loss_fn = nn.CosineSimilarity(eps=1e-6)
 
-    def generate_masks(self, N, s, p1, savepath='masks_zeroshot.npy'):
+    def generate_masks(self, N, s, p1, savepath='masks.npy'):
         cell_size = np.ceil(np.array(self.input_size) / s)
         up_size = (s + 1) * cell_size
 
@@ -59,14 +59,15 @@ class RISEV(nn.Module):
         sal = sal.view((1, H, W))
         sal = sal / N / self.p1
         sal = sal.mean(0, keepdim=True)
+        sal = (sal - sal.min()) / (sal.max() - sal.min())
         return sal
     
 def rise_v(model,image,text_features):
     exp = RISEV(model, (224, 224), gpu_batch=20)
-    if os.path.exists('masks_zeroshot.npy'):
-        exp.load_masks('masks_zeroshot.npy')
+    if os.path.exists('masks.npy'):
+        exp.load_masks('masks.npy')
     else:
-        exp.generate_masks(6000, 8, 0.1, savepath='masks_zeroshot.npy')
+        exp.generate_masks(6000, 8, 0.1, savepath='masks.npy')
     sal = exp(image, text_features)
     return sal
 
