@@ -5,7 +5,6 @@ from transformers.modeling_outputs import BaseModelOutput, BaseModelOutputWithPo
 
 
 def get_hs(model, image_feats):
-    
     hidden_states = model.vision_model.embeddings(image_feats)
     return hidden_states
 
@@ -70,16 +69,6 @@ def mfaba_vision(model,processor,img, prompt):
     for k in inp:
         inp[k] = inp[k].to('cuda')
     grads = list()
-    # hats = [inp['pixel_values'].clone().detach().cpu()]
-    # for _ in range(10):
-    #     inp['pixel_values'] = torch.autograd.Variable(inp['pixel_values'], requires_grad=True)
-    #     out = model(**inp, output_attentions=True)
-    #     model.zero_grad()
-    #     logit = out.logits_per_image[0, 0]
-    #     grad = torch.autograd.grad(logit, inp['pixel_values'])[0]
-    #     grads.append(grad.cpu().detach())
-    #     inp['pixel_values'] = inp['pixel_values'] - 0.01 * grad.sign()
-    #     hats.append(inp['pixel_values'].clone().detach().cpu())
     hs = get_hs(model, inp['pixel_values'])
     text_features = model.get_text_features(inp['input_ids'])
     hats = [hs]
@@ -92,14 +81,20 @@ def mfaba_vision(model,processor,img, prompt):
         grad = torch.autograd.grad(loss, hs)[0]
         hs = hs - 0.01 * grad.sign()
         hats.append(hs)
-        grads.append(grad.cpu().detach())
+        grads.append(grad.detach())
         
     hats = torch.stack(hats)
     hats = hats[1:] - hats[:-1]
     grads = torch.stack(grads)
-    heatmap = -torch.sum(hats * grads, dim=0).squeeze().cpu().detach().numpy()
-    heatmap = (heatmap - heatmap.min()) / (heatmap.max() - heatmap.min())
-    return heatmap
+    heatmap = -torch.sum(hats * grads, dim=0)
+    saliency = torch.nansum(heatmap, -1)[:, 1:]
+    dim = 7
+    saliency = saliency.reshape(saliency.shape[0], 1, dim, dim)
+    saliency = torch.nn.functional.interpolate(
+        saliency, size=224, mode='bilinear')
+    saliency = saliency.cpu().detach().numpy()
+    saliency = (saliency - saliency.min()) / (saliency.max() - saliency.min())
+    return saliency
 
 
 def mfaba_text(model,processor,img, prompt):
