@@ -1,6 +1,64 @@
 import torch
 import numpy as np
 import copy
+from transformers.modeling_outputs import BaseModelOutput, BaseModelOutputWithPooling
+
+
+def get_hs(model, image_feats):
+    
+    hidden_states = model.vision_model.embeddings(image_feats)
+    return hidden_states
+
+def get_output(model, hidden_states):
+    output_attentions = False
+    output_hidden_states = True
+    return_dict = True
+    hidden_states = model.vision_model.pre_layrnorm(hidden_states)
+
+    attention_mask = None
+    causal_attention_mask = None
+    encoder_states = () if output_hidden_states else None
+    all_attentions = () if output_attentions else None
+
+    for idx in range(len(model.vision_model.encoder.layers)):
+        encoder_layer = model.vision_model.encoder.layers[idx]
+        if output_hidden_states:
+            encoder_states = encoder_states + (hidden_states,)
+
+        layer_outputs = encoder_layer(
+            hidden_states,
+            attention_mask,
+            causal_attention_mask,
+            output_attentions=output_attentions,
+        )
+
+        hidden_states = layer_outputs[0]
+
+    if output_attentions:
+        all_attentions = all_attentions + (layer_outputs[1],)
+
+
+    if output_hidden_states:
+        encoder_states = encoder_states + (hidden_states,)
+
+    encoder_outputs = BaseModelOutput(
+        last_hidden_state=hidden_states, hidden_states=encoder_states, attentions=all_attentions
+    )
+
+    last_hidden_state = encoder_outputs[0]
+    pooled_output = last_hidden_state[:, 0, :]
+    pooled_output = model.vision_model.post_layernorm(pooled_output)
+
+    vision_outputs = BaseModelOutputWithPooling(
+        last_hidden_state=last_hidden_state,
+        pooler_output=pooled_output,
+        hidden_states=encoder_outputs.hidden_states,
+        attentions=encoder_outputs.attentions,
+    )
+    pooled_output = vision_outputs[1]
+    image_features = model.visual_projection(pooled_output)
+    return image_features
+    
 
 def mfaba_vision(model,processor,img, prompt):
     inp = processor(
@@ -11,17 +69,16 @@ def mfaba_vision(model,processor,img, prompt):
     for k in inp:
         inp[k] = inp[k].to('cuda')
     grads = list()
-    hats = [inp['pixel_values'].clone().detach().cpu()]
-    for _ in range(10):
-        inp['pixel_values'] = torch.autograd.Variable(inp['pixel_values'], requires_grad=True)
-        out = model(**inp, output_attentions=True)
-        model.zero_grad()
-        logit = out.logits_per_image[0, 0]
-        grad = torch.autograd.grad(logit, inp['pixel_values'])[0]
-        grads.append(grad.cpu().detach())
-        inp['pixel_values'] = inp['pixel_values'] - 0.01 * grad.sign()
-        hats.append(inp['pixel_values'].clone().detach().cpu())
-    
+    # hats = [inp['pixel_values'].clone().detach().cpu()]
+    # for _ in range(10):
+    #     inp['pixel_values'] = torch.autograd.Variable(inp['pixel_values'], requires_grad=True)
+    #     out = model(**inp, output_attentions=True)
+    #     model.zero_grad()
+    #     logit = out.logits_per_image[0, 0]
+    #     grad = torch.autograd.grad(logit, inp['pixel_values'])[0]
+    #     grads.append(grad.cpu().detach())
+    #     inp['pixel_values'] = inp['pixel_values'] - 0.01 * grad.sign()
+    #     hats.append(inp['pixel_values'].clone().detach().cpu()) 
     hats = torch.stack(hats)
     hats = hats[1:] - hats[:-1]
     grads = torch.stack(grads)
