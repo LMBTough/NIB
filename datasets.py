@@ -47,7 +47,7 @@ class ConceptualCaptions(Dataset):
         ann = self.data.iloc[idx]
         caption = ann['caption']
         file_path = ann['file_path']
-        img = Image.open(file_path).convert('RGB')
+        img = Image.open("datasets/" + file_path).convert('RGB')
         img_features = self.image_preprocessor(images=img, return_tensors="pt")['pixel_values']
         text = caption
         return img, text,img_features

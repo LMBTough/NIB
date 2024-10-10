@@ -1,4 +1,4 @@
-from datasets import CCDataset, collate_fn_cc, ImagenetDataset, collect_fn_imagenet, Flickr8kDataset, collate_fn_flickr8k
+from datasets import ConceptualCaptions, collate_fn_cc, ImagenetDataset, collect_fn_imagenet, Flickr8kDataset, collate_fn_flickr8k
 import random
 from scripts.eval import metric_evaluation
 from torch.utils.data import DataLoader
@@ -54,13 +54,13 @@ if __name__ == "__main__":
 
     BS = 32
     if args.dataset == "cc":
-        cc_dataset = CCDataset("cc.csv", image_preprocessor=processor)
+        cc_dataset = ConceptualCaptions("datasets/cc.csv", image_preprocessor=processor)
 
         dataloader = DataLoader(cc_dataset, batch_size=BS,
                                 shuffle=False, collate_fn=collate_fn_cc, num_workers=8)
 
     elif args.dataset == "imagenet":
-        dataloader = DataLoader(ImagenetDataset("tiny-imagenet-200", image_preprocessor=processor,
+        dataloader = DataLoader(ImagenetDataset("datasets/tiny-imagenet-200", image_preprocessor=processor,
                                 split='val'), batch_size=BS, shuffle=False, collate_fn=collect_fn_imagenet, num_workers=8)
 
     elif args.dataset == "flickr8k":
