@@ -110,6 +110,9 @@ coming soon
 
 Code refer to [M2IB](https://github.com/YingWANGG/M2IB)
 
+## Demo
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/LMBTough/NIB/blob/main/colab/demo.ipynb)
+
 <!-- If you find this code useful for your research, please cite:
 
 ```
